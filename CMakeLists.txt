@@ -30,10 +30,12 @@ else (WIN32)
   set(LEVELDB_PLATFORM_NAME LEVELDB_PLATFORM_POSIX)
 endif (WIN32)
 
+#添加选择，类似shell里面的 命令里面的参数
 option(LEVELDB_BUILD_TESTS "Build LevelDB's unit tests" ON)
 option(LEVELDB_BUILD_BENCHMARKS "Build LevelDB's benchmarks" ON)
 option(LEVELDB_INSTALL "Install LevelDB's header and library" ON)
 
+# 对平台默认情况进行检查 CheckIncludeFile CheckLibraryExists CheckCXXSymbolExists
 include(CheckIncludeFile)
 check_include_file("unistd.h" HAVE_UNISTD_H)
 
@@ -51,7 +53,7 @@ include(CheckCXXSymbolExists)
 check_cxx_symbol_exists(fdatasync "unistd.h" HAVE_FDATASYNC)
 check_cxx_symbol_exists(F_FULLFSYNC "fcntl.h" HAVE_FULLFSYNC)
 check_cxx_symbol_exists(O_CLOEXEC "fcntl.h" HAVE_O_CLOEXEC)
-
+# 配置CMAKE_CXX_FLAGS 和 CMAKE_C_FLAGS
 if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   # Disable C++ exceptions.
   string(REGEX REPLACE "/EH[a-z]+" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
@@ -66,7 +68,6 @@ else(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   if(NOT CMAKE_C_FLAGS MATCHES "-Wstrict-prototypes")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wstrict-prototypes")
   endif(NOT CMAKE_C_FLAGS MATCHES "-Wstrict-prototypes")
-
   # Disable C++ exceptions.
   string(REGEX REPLACE "-fexceptions" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions")
@@ -95,6 +96,7 @@ check_cxx_source_compiles("
 int main() { std::string str; return 0; }
 " HAVE_CXX17_HAS_INCLUDE)
 
+# 这里的这个 include/port为啥要引入
 set(LEVELDB_PUBLIC_INCLUDE_DIR "include/leveldb")
 set(LEVELDB_PORT_CONFIG_DIR "include/port")
 
@@ -116,6 +118,7 @@ endif(BUILD_SHARED_LIBS)
 # Must be included before CMAKE_INSTALL_INCLUDEDIR is used.
 include(GNUInstallDirs)
 
+#定义生成一个静态库leveldb, target_sources往这个静态库里面加源文件
 add_library(leveldb "")
 target_sources(leveldb
   PRIVATE
@@ -236,9 +239,11 @@ target_include_directories(leveldb
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
+
 set_target_properties(leveldb
   PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR})
 
+# 下面的是一些编译的相关设置
 target_compile_definitions(leveldb
   PRIVATE
     # Used by include/export.h when building shared libraries.
@@ -267,6 +272,7 @@ if(HAVE_CLANG_THREAD_SAFETY)
       -Werror -Wthread-safety)
 endif(HAVE_CLANG_THREAD_SAFETY)
 
+# 目标库leveldb ，目标库需要连接的库crc32c、snappy、tcmalloc
 if(HAVE_CRC32C)
   target_link_libraries(leveldb crc32c)
 endif(HAVE_CRC32C)
@@ -281,12 +287,16 @@ endif(HAVE_TCMALLOC)
 find_package(Threads REQUIRED)
 target_link_libraries(leveldb Threads::Threads)
 
+# 生成leveldbutil这个目标
 add_executable(leveldbutil
   "db/leveldbutil.cc"
 )
+# 使用leveldbutil的时候会使用到上面生成的leveldb静态库
 target_link_libraries(leveldbutil leveldb)
 
+# 下面的部分是开始构建各种tests
 if(LEVELDB_BUILD_TESTS)
+  # 打开编译的测试按钮
   enable_testing()
 
   # Prevent overriding the parent project's compiler/linker settings on Windows.
@@ -307,8 +317,10 @@ if(LEVELDB_BUILD_TESTS)
   endif(LEVELDB_HAVE_NO_MISSING_FIELD_INITIALIZERS)
 
   function(leveldb_test test_file)
+    # 找到项目里面所有包含test关键字的文件 ${test_file} util/logging_test.cc
     get_filename_component(test_target_name "${test_file}" NAME_WE)
 
+    # 将包含test的文件添加成可静态库文件，接着就是往静态库里面添加文件
     add_executable("${test_target_name}" "")
     target_sources("${test_target_name}"
       PRIVATE
@@ -329,10 +341,10 @@ if(LEVELDB_BUILD_TESTS)
           LEVELDB_HAS_PORT_CONFIG_H=1
       )
     endif(NOT HAVE_CXX17_HAS_INCLUDE)
-
     add_test(NAME "${test_target_name}" COMMAND "${test_target_name}")
   endfunction(leveldb_test)
 
+  # 上面定义了一个函数，现在对函数进行调用
   leveldb_test("db/c_test.c")
   leveldb_test("db/fault_injection_test.cc")
 
@@ -380,6 +392,7 @@ if(LEVELDB_BUILD_TESTS)
   endif(NOT BUILD_SHARED_LIBS)
 endif(LEVELDB_BUILD_TESTS)
 
+#下面的逻辑和上面的类似，下面的是BENCHMARK相关的逻辑
 if(LEVELDB_BUILD_BENCHMARKS)
   function(leveldb_benchmark bench_file)
     get_filename_component(bench_target_name "${bench_file}" NAME_WE)
@@ -422,6 +435,8 @@ if(LEVELDB_BUILD_BENCHMARKS)
   # different manglings when compiled with clang or gcc, at least when installed
   # with Homebrew on Mac.
   set(OLD_CMAKE_REQURED_LIBRARIES ${CMAKE_REQUIRED_LIBRARIES})
+
+  #为啥 ${CMAKE_REQUIRED_LIBRARIES} 这个打印不出来呢
   list(APPEND CMAKE_REQUIRED_LIBRARIES kyotocabinet)
   check_cxx_source_compiles("
 #include <kcpolydb.h>
@@ -439,6 +454,7 @@ int main() {
   endif(HAVE_KYOTOCABINET)
 endif(LEVELDB_BUILD_BENCHMARKS)
 
+# 最后一部分就是安装逻辑
 if(LEVELDB_INSTALL)
   install(TARGETS leveldb
     EXPORT leveldbTargets
@@ -488,3 +504,5 @@ if(LEVELDB_INSTALL)
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"
   )
 endif(LEVELDB_INSTALL)
+
+# TODO  自己写一个test文件加上来，使用的是google的测试框架，还得自己多用用

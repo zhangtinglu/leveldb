@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
+// #ifndef、#define、#endif  A->B A->C B、C->D 避免A被D重复调用
 #ifndef STORAGE_LEVELDB_INCLUDE_DB_H_
 #define STORAGE_LEVELDB_INCLUDE_DB_H_
 
@@ -15,22 +16,26 @@
 namespace leveldb {
 
 // Update CMakeLists.txt if you change these
+// 说明: project(leveldb VERSION 1.22.0 LANGUAGES C CXX) -- 两者统一
 static const int kMajorVersion = 1;
 static const int kMinorVersion = 22;
 
 struct Options;
 struct ReadOptions;
+//疑问: 什么时候用struct，什么时候用class，为啥clion展示的时候对这两者没有做区分呢
 struct WriteOptions;
 class WriteBatch;
 
 // Abstract handle to particular state of a DB.
-// A Snapshot is an immutable object and can therefore be safely
-// accessed from multiple threads without any external synchronization.
+// A Snapshot is an immutable(不变的) object and can therefore be safely
+// accessed from multiple threads without any external synchronization(不同).
+// 疑问：这里Snapshot和DB里面的Snapshot有啥关系，为啥要这样定义
 class LEVELDB_EXPORT Snapshot {
  protected:
   virtual ~Snapshot();
 };
-
+// 疑问: class LEVELDB_EXPORT  struct LEVELDB_EXPORT 为啥一个是class和struct
+// 疑问: 这里的Range是用来干啥的
 // A range of keys
 struct LEVELDB_EXPORT Range {
   Range() = default;
@@ -56,9 +61,11 @@ class LEVELDB_EXPORT DB {
   DB() = default;
 
   DB(const DB&) = delete;
+  //疑问：这个地方的operator是做啥的
   DB& operator=(const DB&) = delete;
 
   virtual ~DB();
+  //疑问：上面的5个函数的是怎么使用的
 
   // Set the database entry for "key" to "value".  Returns OK on success,
   // and a non-OK status on error.
@@ -86,8 +93,8 @@ class LEVELDB_EXPORT DB {
   // May return some other Status on an error.
   virtual Status Get(const ReadOptions& options, const Slice& key,
                      std::string* value) = 0;
-
-  // Return a heap-allocated iterator over the contents of the database.
+// 疑问：heap(堆)-allocated iterator是啥？怎么用
+  // Return a heap(堆)-allocated iterator over the contents of the database.
   // The result of NewIterator() is initially invalid (caller must
   // call one of the Seek methods on the iterator before using it).
   //
